@@ -8,6 +8,7 @@ static class Start {
       Test2 ();      // Test ExprTyper and ExprGrapher
       Test3 ();      // Type checks on various expressions
       Test4 ();      // Tokenizer - printout of invalid token
+      Test5 ();      // Test XML generation
    }
 
    // Test ExprEval and ExprILGen
@@ -90,6 +91,20 @@ static class Start {
       Console.WriteLine ();
       Console.Write ("\nPress any key..."); Console.ReadKey (true);
    }
+
+   // Test XML document generation.
+   static void Test5 () {
+      string expr = "(3 + 2) * 4 - 17 * -five * (two + 1 + 4 + 5)";
+      var node = new Parser (new Tokenizer (expr)).Parse ();
+      Dictionary<string, NType> types = new () { ["five"] = NType.Int, ["two"] = NType.Int };
+      node.Accept (new ExprTyper (types));
+      var xmlDoc = node.Accept (new ExprXML ());
+      Directory.CreateDirectory ("c:/etc");
+      File.WriteAllText ("c:/etc/test.xml", xmlDoc.ToString ());
+      var pi = new ProcessStartInfo ("c:/etc/test.xml") { UseShellExecute = true };
+      Process.Start (pi);
+   }
+
    static string Prog0 = """
       program Expr;
       var
