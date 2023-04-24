@@ -68,6 +68,8 @@ public class Parser {
       if (Match (IDENT)) {
          if (Match (ASSIGN)) return AssignStmt ();
       }
+      // Matching If statement.
+      if (Match (IF)) return IfStmt ();
       Unexpected ();
       return null!;
    }
@@ -87,6 +89,17 @@ public class Parser {
    // assign-stmt = IDENT ":=" expr .
    NAssignStmt AssignStmt () 
       => new (PrevPrev, Expression ());
+
+   // If-stmt = "if" expression "then" statement [ "else" statement] .
+   NIfStmt IfStmt () {
+      var expr = Expression ();
+      Expect (THEN);
+      var ifStmt = Stmt (); Match (SEMI);
+      NStmt? elseStmt = null;
+      if (Match (ELSE))
+         elseStmt = Stmt ();
+      return new NIfStmt (expr, ifStmt, elseStmt);
+   }
    #endregion
 
    #region Expression --------------------------------------

@@ -48,6 +48,11 @@ public record NWriteStmt (bool NewLine, NExpr[] Exprs) : NStmt {
 public record NAssignStmt (Token Name, NExpr Expr) : NStmt {
    public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
 }
+
+// If else statement
+public record NIfStmt (NExpr Expr,  NStmt IfStmt, NStmt? ElseStmt) : NStmt {
+   public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
+}
 #endregion
 
 #region Expression nodes -------------------------------------------------------

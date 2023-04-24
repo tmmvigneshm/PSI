@@ -43,6 +43,18 @@ public class PSIPrint : Visitor<StringBuilder> {
       return Write (");");
    }
 
+   public override StringBuilder Visit (NIfStmt i) {
+      NWrite ("if ");
+      i.Expr.Accept (this);
+      Write (" then");
+      i.IfStmt.Accept (this);
+      if (i.ElseStmt != null) {
+         NWrite ("else");
+         i.ElseStmt.Accept (this);
+      }
+      return S;
+   }
+
    public override StringBuilder Visit (NLiteral t)
       => Write (t.Value.ToString ());
 
