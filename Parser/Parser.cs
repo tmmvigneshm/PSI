@@ -4,6 +4,7 @@
 namespace PSI;
 using static Token.E;
 using static NType;
+using System.Collections.Generic;
 
 public class Parser {
    // Interface -------------------------------------------
@@ -31,9 +32,36 @@ public class Parser {
    // declarations = [var-decls] [procfn-decls] .
    NDeclarations Declarations () {
       List<NVarDecl> vars = new ();
-      if (Match (VAR)) 
+      List<NVarDecl> funcVars = new ();
+      List<NFnDecl> funcDecs = new (); // Multiple function declarations.
+      if (Match (VAR))
          do { vars.AddRange (VarDecls ()); Expect (SEMI); } while (Peek (IDENT));
-      return new (vars.ToArray ());
+      // func - decl = "function" IDENT paramlist ":" type; block ";".
+      do {
+         if (Match (FUNCTION, PROCEDURE)) {
+            var prevKind = Prev.Kind;
+            var ident = Expect (IDENT);
+            // Parse for param-list
+            // paramlist         =  "(" var-decl { "," var-decl } ")"
+            // var-decl          =  ident-list ":" type .
+            Expect (OPEN);
+            funcVars.Clear ();
+            if (Peek (IDENT)) {
+               do { funcVars.AddRange (VarDecls ()); } while (Match (SEMI));
+            }
+            Expect (CLOSE);
+            NType type = Unknown;
+            if (prevKind == FUNCTION) {
+               Expect (COLON);
+               type = Type ();
+            }
+            Expect (SEMI);
+            var block = Block ();
+            Match (SEMI);
+            funcDecs.Add (new NFnDecl (ident, type, funcVars.ToArray (), block));
+         }
+      } while (Peek (FUNCTION, PROCEDURE));
+      return new (vars.ToArray (), funcDecs.ToArray ());
    }
 
    // ident-list = IDENT { "," IDENT }
@@ -67,9 +95,18 @@ public class Parser {
       if (Match (WRITE, WRITELN)) return WriteStmt ();
       if (Match (IDENT)) {
          if (Match (ASSIGN)) return AssignStmt ();
+         // call-stmt = IDENT arglist .
+         if (Peek (OPEN)) {
+            var obj = new NFnCallStmt (Prev, ArgList ());
+            if (Match (SEMI)) {
+                  return obj;
+            }
+         }
       }
       // Matching If statement.
       if (Match (IF)) return IfStmt ();
+      if (Match (FOR)) return ForStmt ();
+      if (Match (READ)) return ReadStmt ();
       Unexpected ();
       return null!;
    }
@@ -90,6 +127,14 @@ public class Parser {
    NAssignStmt AssignStmt () 
       => new (PrevPrev, Expression ());
 
+   // read-stmt =  "read" "(" identlist ")" .
+   NReadStmt ReadStmt () {
+      Expect (OPEN);
+      var obj = new NReadStmt (IdentList ());
+      Expect (CLOSE);
+      return obj;
+   }
+
    // If-stmt = "if" expression "then" statement [ "else" statement] .
    NIfStmt IfStmt () {
       var expr = Expression ();
@@ -99,6 +144,24 @@ public class Parser {
       if (Match (ELSE))
          elseStmt = Stmt ();
       return new NIfStmt (expr, ifStmt, elseStmt);
+   }
+
+   // for-stmt          =  "for" IDENT ":=" expression ( "to" | "downto" ) expression "do" statement .
+   // 'IDENT ":=" expression' similar to assignment statement
+   NForStmt ForStmt () {
+      Expect (IDENT);
+      Expect (ASSIGN);
+      var assignment = AssignStmt ();
+      Expect (TO, DOWNTO);
+      var exp = Expression ();
+      Expect (DO);
+      List<NStmt> stmts = new ();
+      if (Peek (BEGIN)) {
+         stmts = CompoundStmt ().Stmts.ToList ();
+      } else {
+         stmts.Add (Stmt ()); Match (SEMI);
+      }
+      return new NForStmt (assignment, exp, stmts.ToArray ());
    }
    #endregion
 

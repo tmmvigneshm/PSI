@@ -20,11 +20,37 @@ public class PSIPrint : Visitor<StringBuilder> {
             NWrite ($"{g.Select (a => a.Name).ToCSV ()} : {g.Key};");
          N--;
       }
+      if (d.Funcs.Length > 0) {
+         foreach (var f in d.Funcs) Visit (f);
+      }
       return S;
    }
 
    public override StringBuilder Visit (NVarDecl d)
       => NWrite ($"{d.Name} : {d.Type}");
+
+   public override StringBuilder Visit (NFnDecl f) {
+      if (f.Type != NType.Unknown)
+         NWrite ("function ");
+      else NWrite ("procedure ");
+      N++;
+      Write (f.Name.Text);
+      Write ("(");
+      string dec = "";
+      foreach (var g in f.Params.GroupBy (a => a.Type))
+         dec += $"{g.Select (a => a.Name).ToCSV ()} : {g.Key},";
+      if (dec.EndsWith (",")) dec = dec[..^1];
+      Write (dec);
+      Write (")");
+      if (f.Type != NType.Unknown)
+         Write ($": {f.Type}");
+      Write (";");
+      // Print block
+      Visit (f.Block);
+      Write (";");
+      N--;
+      return S;
+   }
 
    public override StringBuilder Visit (NCompoundStmt b) {
       NWrite ("begin"); N++;  Visit (b.Stmts); N--; return NWrite ("end"); 
@@ -47,11 +73,46 @@ public class PSIPrint : Visitor<StringBuilder> {
       NWrite ("if ");
       i.Expr.Accept (this);
       Write (" then");
+      N++;
       i.IfStmt.Accept (this);
+      N--;
       if (i.ElseStmt != null) {
          NWrite ("else");
+         N++;
          i.ElseStmt.Accept (this);
+         N--;
       }
+      return S;
+   }
+
+   public override StringBuilder Visit (NFnCallStmt f) {
+      NWrite (f.Name.Text + "(");
+      for (int i = 0; i < f.Exprs.Length; i++) {
+         if (i > 0) Write (",");
+         f.Exprs[i].Accept (this);
+      }
+      return Write (");");
+   }
+
+   public override StringBuilder Visit (NReadStmt r) {
+      NWrite ("read (");
+      for(int i =0; i < r.Tokens.Length; i++) {
+         if (i > 0) Write (",");
+         Write ($"{r.Tokens[i].Text}");
+      }
+     return Write (")");
+   }
+   public override StringBuilder Visit (NForStmt f) {
+      var a = f.Assignment;
+      NWrite ("for ");
+      Write ($"{a.Name} := "); a.Expr.Accept (this);
+      // determine to or downto
+      Write (" to ");
+      f.Expr.Accept (this);
+      Write (" do ");
+      Write ("begin");
+      f.Stmt.ForEach (x => x.Accept (this)); // More test needed.
+      NWrite ("end;");
       return S;
    }
 

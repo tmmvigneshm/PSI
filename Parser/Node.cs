@@ -20,12 +20,16 @@ public record NBlock (NDeclarations Decls, NCompoundStmt Body) : Node {
 }
 
 // The declarations section precedes the body of every block
-public record NDeclarations (NVarDecl[] Vars) : Node {
+public record NDeclarations (NVarDecl[] Vars, NFnDecl[] Funcs) : Node {
    public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
 }
 
 // Declares a variable (with a type)
 public record NVarDecl (Token Name, NType Type) : Node {
+   public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
+}
+
+public record NFnDecl (Token Name, NType Type, NVarDecl[] Params, NBlock Block) : Node {
    public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
 }
 #endregion
@@ -51,6 +55,18 @@ public record NAssignStmt (Token Name, NExpr Expr) : NStmt {
 
 // If else statement
 public record NIfStmt (NExpr Expr,  NStmt IfStmt, NStmt? ElseStmt) : NStmt {
+   public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
+}
+
+public record NForStmt (NAssignStmt Assignment, NExpr Expr, NStmt[] Stmt) : NStmt {
+   public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
+}
+
+public record NFnCallStmt (Token Name, NExpr[] Exprs) : NStmt {
+   public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
+}
+
+public record NReadStmt (Token[] Tokens) : NStmt {
    public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
 }
 #endregion
