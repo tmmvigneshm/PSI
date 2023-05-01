@@ -23,15 +23,32 @@ public class TypeAnalyze : Visitor<NType> {
    }
 
    public override NType Visit (NDeclarations d) {
-      Visit (d.Vars); return Visit (d.Funcs);
+      Visit (d.Consts);  Visit (d.Vars); return Visit (d.Funcs);
+   }
+
+   public override NType Visit (NConstDecl c) {
+      mSymbols.Consts.Add (c);
+      ((NLiteral)c.Expr).Accept (this);
+      return c.Expr.Type;
    }
 
    public override NType Visit (NVarDecl d) {
+      // Check multiple varialbes declared in the same scope.
+      var node = mSymbols.Find (d.Name.Text);
+      if (node != null) {
+         string? txt = node is NConstDecl ? $"{((NConstDecl)node).Expr.Type}" : $"{((NVarDecl)node).Type}";
+         throw new ParseException (d.Name, $"A variable named '{d.Name.Text}' of type '{txt}' is already defined in this scope");
+      }
       mSymbols.Vars.Add (d);
       return d.Type;
    }
 
    public override NType Visit (NFnDecl f) {
+      var node = mSymbols.Find (f.Name.Text);
+      if (node is NFnDecl)
+         throw new ParseException (f.Name, $"A function called '{f.Name.Text}' is already defined in this scope");
+      if (node != null)
+         throw new ParseException (f.Name, $"Invalid function name. A variable with name '{f.Name.Text}' already defined in this scope");
       mSymbols.Funcs.Add (f);
       return f.Return;
    }
@@ -88,7 +105,10 @@ public class TypeAnalyze : Visitor<NType> {
    }
 
    public override NType Visit (NCallStmt c) {
-      throw new NotImplementedException ();
+      if (mSymbols.Find (c.Name.Text) is NFnDecl fn)
+         return AddFnParamTypes (fn, c.Params, c.Name);
+
+      throw new ParseException (c.Name, $"Function {c.Name.Text} does not exist in the current context");
    }
    #endregion
 
@@ -136,11 +156,42 @@ public class TypeAnalyze : Visitor<NType> {
    public override NType Visit (NIdentifier d) {
       if (mSymbols.Find (d.Name.Text) is NVarDecl v) 
          return d.Type = v.Type;
+      if (mSymbols.Find (d.Name.Text) is NConstDecl c) {
+         ((NLiteral)c.Expr).Accept (this);
+         return d.Type = c.Expr.Type;
+      }
       throw new ParseException (d.Name, "Unknown variable");
    }
 
+   // Check for types.
+   // If types match fine, otherwise do typecase whereever possible.
+   // Helper function, source type and target type is it possible to add a cast.
+   // Throw exception if not parameters match.
+   // Return type assignment already handled.
    public override NType Visit (NFnCall f) {
-      throw new NotImplementedException ();
+      if (mSymbols.Find (f.Name.Text) is NFnDecl fd) {
+         return f.Type = AddFnParamTypes (fd, f.Params, f.Name);
+      }
+      throw new ParseException (f.Name, $"Function {f.Name.Text} does not exist in the current context");
+   }
+
+   // TODO: Need to support method overload.
+   // e.g. Source:Max(int,int) to Target:Max(double,double)
+   NType AddFnParamTypes (NFnDecl fnDecl, NExpr[] exprs, Token token) {
+      if (fnDecl.Params.Length != exprs.Length) {
+         throw new ParseException (token, $"No overload for function '{token.Text}' takes {exprs.Length} aruguments");
+      }
+      for (int i = 0; i < exprs.Length; i++) {
+         var srcType = exprs[i].Accept (this);
+         var target = fnDecl.Params[i];
+         // Type cast should be possible in function call, for int to real.
+         var iConversionPossible = srcType == Int && target.Type == Real;
+         if (!iConversionPossible && srcType != target.Type) {
+            throw new ParseException (token, $"Argument{i + 1}: Cannot convert from '{srcType}' to '{target.Type}'");
+         }
+         exprs[i] = AddTypeCast (token, exprs[i], target.Type);
+      }
+      return fnDecl.Return;
    }
 
    public override NType Visit (NTypeCast c) {
@@ -148,7 +199,8 @@ public class TypeAnalyze : Visitor<NType> {
    }
    #endregion
 
-   NType Visit (IEnumerable<Node> nodes) {
+   NType Visit (IEnumerable<Node>? nodes) {
+      if (nodes == null) return NType.Void;
       foreach (var node in nodes) node.Accept (this);
       return NType.Void;
    }
