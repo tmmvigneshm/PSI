@@ -35,22 +35,32 @@ public class TypeAnalyze : Visitor<NType> {
    public override NType Visit (NVarDecl d) {
       // Check multiple varialbes declared in the same scope.
       var node = mSymbols.Find (d.Name.Text);
-      if (node != null) {
-         string? txt = node is NConstDecl ? $"{((NConstDecl)node).Expr.Type}" : $"{((NVarDecl)node).Type}";
-         throw new ParseException (d.Name, $"A variable named '{d.Name.Text}' of type '{txt}' is already defined in this scope");
-      }
+      ValidateNode (node, d.Name);
       mSymbols.Vars.Add (d);
       return d.Type;
    }
 
    public override NType Visit (NFnDecl f) {
       var node = mSymbols.Find (f.Name.Text);
-      if (node is NFnDecl)
-         throw new ParseException (f.Name, $"A function called '{f.Name.Text}' is already defined in this scope");
-      if (node != null)
-         throw new ParseException (f.Name, $"Invalid function name. A variable with name '{f.Name.Text}' already defined in this scope");
+      ValidateNode (node, f.Name);
       mSymbols.Funcs.Add (f);
+      // Nested function check.
+      Visit (f.Params);
+      if (f.Body is not null) Visit (f.Body);
       return f.Return;
+   }
+
+
+   /// <summary>A helper function to validate a node</summary>
+   void ValidateNode (Node? node, Token token) {
+      if (node == null) return;
+      (NType type, string nodekind) = node switch {
+         NConstDecl c => (c.Expr.Type, "constant"),
+         NVarDecl v => (v.Type, $"variable"),
+         NFnDecl fn => (fn.Return, $"function"),
+         _ => throw new NotImplementedException ()
+      };
+      throw new ParseException (token, $"Invalid name: A {nodekind} named '{token.Text}' of type '{type}' is already defined in this scope");
    }
    #endregion
 
@@ -91,7 +101,7 @@ public class TypeAnalyze : Visitor<NType> {
    }
 
    public override NType Visit (NReadStmt r) {
-      throw new NotImplementedException ();
+      return Void; // For testing.
    }
 
    public override NType Visit (NWhileStmt w) {
@@ -184,12 +194,10 @@ public class TypeAnalyze : Visitor<NType> {
       for (int i = 0; i < exprs.Length; i++) {
          var srcType = exprs[i].Accept (this);
          var target = fnDecl.Params[i];
-         // Type cast should be possible in function call, for int to real.
-         var iConversionPossible = srcType == Int && target.Type == Real;
-         if (!iConversionPossible && srcType != target.Type) {
+         try { exprs[i] = AddTypeCast (token, exprs[i], target.Type); } catch {
+            // Trying to specify argument index in the error message.
             throw new ParseException (token, $"Argument{i + 1}: Cannot convert from '{srcType}' to '{target.Type}'");
          }
-         exprs[i] = AddTypeCast (token, exprs[i], target.Type);
       }
       return fnDecl.Return;
    }
