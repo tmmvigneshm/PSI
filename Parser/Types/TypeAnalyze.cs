@@ -45,6 +45,7 @@ public class TypeAnalyze : Visitor<NType> {
       ValidateNode (node, f.Name);
       mSymbols.Funcs.Add (f);
       // Nested function check.
+      // TODO: Rework required to support valid declaration, block statements.
       Visit (f.Params);
       if (f.Body is not null) Visit (f.Body);
       return f.Return;
