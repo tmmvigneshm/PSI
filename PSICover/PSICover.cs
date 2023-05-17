@@ -170,7 +170,8 @@ class Analyzer {
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
             if (hit) hitCount++;
-            string tag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
+            string hitStyles = hit ? "hit tooltip" : "unhit";
+            string tag = $"<span class=\"{hitStyles}\">";
             // Another solution, But this does not provide indentation.
             //if (block.ELine - block.SLine > 0) tag = tag.Replace (">", " style=\"white-space:pre-line\">");
 
@@ -184,12 +185,20 @@ class Analyzer {
                   var trimmedCode = code[lineIndex].Trim ();
                   var startIdx = code[lineIndex].IndexOf (trimmedCode);
                   code[lineIndex] = code[lineIndex].Insert (lineLength, "</span>");
+                  if (hit) AddTooltip (lineIndex, lineLength);
                   code[lineIndex] = code[lineIndex].Insert (startIdx, tag);
                }
                continue;
             }
             code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
+            if (hit) AddTooltip (block.ELine, block.ECol);
             code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
+
+            void AddTooltip (int lineIdx, int pos) {
+               // Add tooltip span before the closing tag.
+               string tooltipTag = $"<span class=\"tooltip tooltiptext\"> Hit count: {hits[block.Id]} </span>";
+               code[lineIdx] = code[lineIdx].Insert (pos, tooltipTag);
+            }
          }
          var htmlDir = $"{Dir}/HTML";
          Directory.CreateDirectory (htmlDir);
@@ -199,6 +208,21 @@ class Analyzer {
             <html><head><style>
             .hit { background-color:aqua; }
             .unhit { background-color:orange; }
+            .tooltip { position: relative; display: inline; }
+            .tooltiptext {
+              border: 1px solid black;
+              visibility: hidden;
+              text-align: center;
+              background-color:yellow;
+              color:black;
+              padding: 5px;
+              width:150px;
+              word-wrap:break-word;
+              position: absolute;
+              left: 110%;
+              z-index:10;
+            }
+            .tooltip:hover .tooltiptext { visibility: visible; }
             </style></head>
             <body><pre>
             {{string.Join ("\r\n", code)}}
@@ -331,7 +355,7 @@ class Table {
        $"<tr>\n<td>{file}</td>\n<td>{blocks}</td>\n<td>{blockscovered}</td>\n<td>{coverPercent}</td>\n</tr>";
    #endregion
 
-   List<string> headers = new () { "Source file", "Blocks", "Blocks covered", "Coverage %" };
+   List<string> headers = new () { "Source files", "Blocks", "Blocks covered", "Coverage %" };
    readonly List<Tuple<string, int, int, double>> Coverages;
 }
 
