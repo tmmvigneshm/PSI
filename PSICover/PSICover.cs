@@ -171,6 +171,23 @@ class Analyzer {
             bool hit = hits[block.Id] > 0;
             if (hit) hitCount++;
             string tag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
+            // Another solution, But this does not provide indentation.
+            //if (block.ELine - block.SLine > 0) tag = tag.Replace (">", " style=\"white-space:pre-line\">");
+
+            // Break multiple lines and attach span element to each line.
+            var linesCount = block.ELine - block.SLine;
+            if (linesCount > 0) {
+               // Consider start and end line from the multiple lines.
+               for (int i = 0; i <= linesCount; i++) {
+                  int lineIndex = block.SLine + i;
+                  var lineLength = code[lineIndex].Length;
+                  var trimmedCode = code[lineIndex].Trim ();
+                  var startIdx = code[lineIndex].IndexOf (trimmedCode);
+                  code[lineIndex] = code[lineIndex].Insert (lineLength, "</span>");
+                  code[lineIndex] = code[lineIndex].Insert (startIdx, tag);
+               }
+               continue;
+            }
             code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
             code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
          }
