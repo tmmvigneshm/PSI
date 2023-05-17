@@ -1,5 +1,6 @@
 ﻿namespace PSICover;
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 
 // The CoverageAnalyzer for .Net
@@ -19,6 +20,7 @@ class Analyzer {
          Modules.ForEach (Assemble);
          RunCode ();
          GenerateOutputs ();
+         GenerateSummary ();
       } finally {
          Modules.ForEach (RestoreBackup);
       }
@@ -130,6 +132,7 @@ class Analyzer {
    };
    static Regex mRxLine = new Regex (@"\.line (\d+),(\d+) : (\d+),(\d+) '(.*)'");
    List<Block> mBlocks = new ();
+   List<Tuple<string, int, int, double>> mCoverages = new ();
 
    // Re-assemble instrumented DLLs from the modified ASMs
    void Assemble (string module) {
@@ -163,13 +166,17 @@ class Analyzer {
          var code = File.ReadAllLines (file);
          for (int i = 0; i < code.Length; i++)
             code[i] = code[i].Replace ('<', '\u00ab').Replace ('>', '\u00bb');
+         int hitCount = 0;
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
+            if (hit) hitCount++;
             string tag = $"<span class=\"{(hit ? "hit" : "unhit")}\">";
             code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
             code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
          }
-         string htmlfile = $"{Dir}/HTML/{Path.GetFileNameWithoutExtension (file)}.html";
+         var htmlDir = $"{Dir}/HTML";
+         Directory.CreateDirectory (htmlDir);
+         string htmlfile = Path.Combine (htmlDir, Path.GetFileNameWithoutExtension (file) + ".html");
 
          string html = $$"""
             <html><head><style>
@@ -182,10 +189,25 @@ class Analyzer {
             """;
          html = html.Replace ("\u00ab", "&lt;").Replace ("\u00bb", "&gt;");
          File.WriteAllText (htmlfile, html);
+
+         // Add the file coverage report to coverages collection.
+         var hitPercent = Math.Round (100.0 * hitCount / blocks.Count, 1);
+         mCoverages.Add (Tuple.Create (Path.GetFileName (file), blocks.Count, hitCount, hitPercent));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
       Console.WriteLine ($"Coverage: {cHit}/{cBlocks}, {percent}%");
+   }
+
+   /// <summary>Generates HTML summary for the code coverages.</summary>
+   void GenerateSummary () {
+      string summaryContent = new Table (mCoverages).Generate ();
+      var path = $"{Dir}/HTML/summary.html";
+      File.WriteAllText (path, summaryContent);
+      var proc = new Process {
+         StartInfo = new ProcessStartInfo (path) { UseShellExecute = true }
+      };
+      proc.Start ();
    }
 
    // Restore the DLLs and PDBs from the backups
@@ -231,6 +253,69 @@ class Block {
    public int EPosition => ELine * 10000 + ECol;
    public readonly string File;
    static string sLastFile = "";
+}
+
+/// <summary>Creates table to summarize the coverage report</summary>
+class Table {
+   public Table (List<Tuple<string, int, int, double>> coverages) {
+      Coverages = coverages;
+   }
+
+   /// <summary>Generates the summary.</summary>
+   public string Generate () {
+      StringBuilder table = new ();
+      table.AppendLine ("<table width=\"50%\">");
+      table.AppendLine ("<caption>Coverage summary</caption>");
+      // Add table headers.
+      table.AppendLine ("<tr>");
+      for (int i = 0; i < headers.Count; i++) {
+         var head = NewHeader (headers[i], i == 0);
+         table.AppendLine (head);
+      }
+      table.AppendLine ("</tr>");
+      // Add table rows.
+      foreach (var coverage in Coverages.OrderBy (x => x.Item4))
+         table.AppendLine (NewRow (coverage.Item1, coverage.Item2, coverage.Item3, coverage.Item4));
+
+      return TableToHTML (table.ToString ());
+   }
+
+   string TableToHTML (string tablebody) {
+      var content = $$""""
+         <html>
+         <head>
+           <style>
+           	table, th {
+         		  border: 1px solid black;
+         		  border-collapse: collapse;
+         		  text-align:left;
+           	}
+           	td {
+           		border: 1px solid black;
+           		border-collapse: collapse;
+           	}
+           </style>
+         </head>
+         <body>
+         	<div>
+            {{tablebody}}
+            </div>
+         </body>
+         </html>
+         """";
+      return content;
+   }
+
+   #region helpers
+   string NewHeader (string heading, bool extraWidth = false) =>
+    extraWidth ? $"<th width=\"40%\">{heading}</th>" : $" <th>{heading}</th>";
+
+   string NewRow (string file, int blocks, int blockscovered, double coverPercent) =>
+       $"<tr>\n<td>{file}</td>\n<td>{blocks}</td>\n<td>{blockscovered}</td>\n<td>{coverPercent}</td>\n</tr>";
+   #endregion
+
+   List<string> headers = new () { "Source file", "Blocks", "Blocks covered", "Coverage %" };
+   readonly List<Tuple<string, int, int, double>> Coverages;
 }
 
 static class Program {
