@@ -132,7 +132,7 @@ class Analyzer {
    };
    static Regex mRxLine = new Regex (@"\.line (\d+),(\d+) : (\d+),(\d+) '(.*)'");
    List<Block> mBlocks = new ();
-   List<Tuple<string, int, int, double>> mCoverages = new ();
+   List<(string, int, int, double)> mCoverages = new ();
 
    // Re-assemble instrumented DLLs from the modified ASMs
    void Assemble (string module) {
@@ -166,33 +166,28 @@ class Analyzer {
          var code = File.ReadAllLines (file);
          for (int i = 0; i < code.Length; i++)
             code[i] = code[i].Replace ('<', '\u00ab').Replace ('>', '\u00bb');
-         int hitCount = 0;
+         int cHits = 0;
          foreach (var block in blocks) {
             bool hit = hits[block.Id] > 0;
-            if (hit) hitCount++;
+            if (hit) cHits++;
             string hitStyles = hit ? "hit tooltip" : "unhit";
             string tag = $"<span class=\"{hitStyles}\">";
             // Another solution, But this does not provide indentation.
             //if (block.ELine - block.SLine > 0) tag = tag.Replace (">", " style=\"white-space:pre-line\">");
 
-            // Break multiple lines and attach span element to each line.
-            var linesCount = block.ELine - block.SLine;
-            if (linesCount > 0) {
-               // Consider start and end line from the multiple lines.
-               for (int i = 0; i <= linesCount; i++) {
-                  int lineIndex = block.SLine + i;
-                  var lineLength = code[lineIndex].Length;
-                  var trimmedCode = code[lineIndex].Trim ();
-                  var startIdx = code[lineIndex].IndexOf (trimmedCode);
-                  code[lineIndex] = code[lineIndex].Insert (lineLength, "</span>");
-                  if (hit) AddTooltip (lineIndex, lineLength);
-                  code[lineIndex] = code[lineIndex].Insert (startIdx, tag);
+            // Attach span element to each line.
+            var cLines = block.ELine - block.SLine;
+            for (int i = 0; i <= cLines; i++) {
+               int lineIndex = block.SLine + i;
+               int endCol = block.ECol; int startCol = block.SCol;
+               if (cLines > 0) {
+                  endCol = code[lineIndex].Length;
+                  startCol = code[lineIndex].TakeWhile (char.IsWhiteSpace).Count ();
                }
-               continue;
+               code[lineIndex] = code[lineIndex].Insert (endCol, "</span>");
+               if (hit) AddTooltip (lineIndex, endCol);
+               code[lineIndex] = code[lineIndex].Insert (startCol, tag);
             }
-            code[block.ELine] = code[block.ELine].Insert (block.ECol, "</span>");
-            if (hit) AddTooltip (block.ELine, block.ECol);
-            code[block.SLine] = code[block.SLine].Insert (block.SCol, tag);
 
             void AddTooltip (int lineIdx, int pos) {
                // Add tooltip span before the closing tag.
@@ -232,8 +227,8 @@ class Analyzer {
          File.WriteAllText (htmlfile, html);
 
          // Add the file coverage report to coverages collection.
-         var hitPercent = Math.Round (100.0 * hitCount / blocks.Count, 1);
-         mCoverages.Add (Tuple.Create (Path.GetFileName (file), blocks.Count, hitCount, hitPercent));
+         var hitPercent = Math.Round (100.0 * cHits / blocks.Count, 1);
+         mCoverages.Add ((Path.GetFileName (file), blocks.Count, cHits, hitPercent));
       }
       int cBlocks = mBlocks.Count, cHit = hits.Count (a => a > 0);
       double percent = Math.Round (100.0 * cHit / cBlocks, 1);
@@ -298,8 +293,8 @@ class Block {
 
 /// <summary>Creates table to summarize the coverage report</summary>
 class Table {
-   public Table (List<Tuple<string, int, int, double>> coverages) {
-      Coverages = coverages;
+   public Table (List<(string, int, int, double)> coverages) {
+      mCoverages = coverages;
    }
 
    /// <summary>Generates the summary.</summary>
@@ -309,13 +304,13 @@ class Table {
       table.AppendLine ("<caption>Coverage summary</caption>");
       // Add table headers.
       table.AppendLine ("<tr>");
-      for (int i = 0; i < headers.Count; i++) {
-         var head = NewHeader (headers[i], i == 0);
+      for (int i = 0; i < mHeaders.Count; i++) {
+         var head = NewHeader (mHeaders[i], i == 0);
          table.AppendLine (head);
       }
       table.AppendLine ("</tr>");
       // Add table rows.
-      foreach (var coverage in Coverages.OrderBy (x => x.Item4))
+      foreach (var coverage in mCoverages.OrderBy (x => x.Item4))
          table.AppendLine (NewRow (coverage.Item1, coverage.Item2, coverage.Item3, coverage.Item4));
 
       return TableToHTML (table.ToString ());
@@ -355,8 +350,8 @@ class Table {
        $"<tr>\n<td>{file}</td>\n<td>{blocks}</td>\n<td>{blockscovered}</td>\n<td>{coverPercent}</td>\n</tr>";
    #endregion
 
-   List<string> headers = new () { "Source files", "Blocks", "Blocks covered", "Coverage %" };
-   readonly List<Tuple<string, int, int, double>> Coverages;
+   List<string> mHeaders = new () { "Source files", "Blocks", "Blocks covered", "Coverage %" };
+   readonly List<(string, int, int, double)> mCoverages;
 }
 
 static class Program {
