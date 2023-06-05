@@ -66,8 +66,18 @@ public class ILCodeGen : Visitor {
       }
       if (w.NewLine) Out ("    call void [System.Console]System.Console::WriteLine ()");
    }
-   
-   public override void Visit (NIfStmt f) => throw new NotImplementedException ();
+
+   public override void Visit (NIfStmt f) {
+      var lbl1 = NextLabel ();
+      var lbl2 = NextLabel ();
+
+      f.Condition.Accept (this);
+      Out ($"    brfalse {lbl2}");
+      Out ($"  {lbl1}:");
+      f.IfPart.Accept (this);
+      Out ($"   {lbl2}:");
+   }
+
    public override void Visit (NForStmt f) => throw new NotImplementedException ();
    public override void Visit (NReadStmt r) => throw new NotImplementedException ();
 
@@ -131,8 +141,21 @@ public class ILCodeGen : Visitor {
          Out ("    call string [System.Runtime]System.String::Concat (string, string)");
       else {
          string op = b.Op.Kind.ToString ().ToLower ();
-         op = op switch { "mod" => "rem", "eq" => "ceq", "lt" => "clt", _ => op };
-         Out ($"    {op}");
+         op = op switch { "mod" => "rem", "eq" => "ceq", "lt" => "clt", "gt" => "cgt", _ => op };
+         if (op == "leq") {
+            Out ("    cgt");
+            Out ("    ldc.i4 0");
+            Out ("    ceq");
+         } else if (op == "neq") {
+            Out ("    ceq");
+            Out ("    ldc.i4 0");
+            Out ("    ceq");
+         } else if (op == "geq") {
+            Out ("    clt");
+            Out ("    ldc.i4 0");
+            Out ("    ceq");
+            return;
+         } else Out ($"    {op}");
       }
    }
    
