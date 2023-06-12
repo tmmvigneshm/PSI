@@ -91,7 +91,8 @@ public record NWhileStmt (NExpr Condition, NStmt Body) : NStmt {
 }
 
 // Break statement.
-public record NBreakStmt () : NStmt {
+public record NBreakStmt (Token? Token) : NStmt {
+   public int Level { get; set; } = 1;
    public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
    public override void Accept (Visitor visitor) => visitor.Visit (this);
 }

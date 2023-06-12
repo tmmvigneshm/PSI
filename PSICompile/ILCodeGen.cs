@@ -160,7 +160,15 @@ public class ILCodeGen : Visitor {
    string NextLabel () => $"IL_{++mLabel:D4}";
    int mLabel;
 
-   public override void Visit (NBreakStmt b) => Out ($"    br {mLoops.Peek ()}");  
+   public override void Visit (NBreakStmt b) {
+      if (b.Level == 1) Out ($"    br {mLoops.Peek ()}");
+      else {
+         try {
+            var brlabl = mLoops.Reverse ().ElementAt (mLoops.Count - b.Level);
+            Out ($"   br {brlabl}");
+         } catch { throw new Exception ("Invalid break statement"); }
+      }
+   }
 
    public override void Visit (NCallStmt c) => CallFunction (c.Name, c.Params);
 

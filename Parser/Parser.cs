@@ -162,7 +162,12 @@ public class Parser {
    NBreakStmt BreakStmt () {
       // TODO: Match for argument in the break statement for levels.
       // Start with level 1, i.e no arguments.
-      return new NBreakStmt ();
+      Token? token = null;
+      if (Peek (L_INTEGER)) {
+         token = Expect (L_INTEGER);
+         Match (SEMI);
+      }
+      return new NBreakStmt (token);
    }
 
    // write-stmt =  ( "writeln" | "write" ) "(" arglist ")" .

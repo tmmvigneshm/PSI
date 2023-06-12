@@ -123,6 +123,7 @@ class TypeAnalyze : Visitor<NType> {
    }
 
    public override NType Visit (NBreakStmt b) {
+      if (b.Token != null) b.Level = int.Parse (b.Token.Text);
       return Void;
    }
 

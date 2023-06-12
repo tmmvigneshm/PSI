@@ -1,4 +1,4 @@
-program Comp6;
+program Comp15;
 var
   i, j, k: integer;
 begin
@@ -10,7 +10,7 @@ begin
 		for j := 101 to 110 do begin
 			if(j = 103) then begin
 				while k < 5 do begin	
-					if(k = 2) then break;
+					if(k = 2) then break 2;
 					WriteLn("Loop 3:", " *");
 					k := k + 1;
 				end;
