@@ -40,6 +40,7 @@ public class PSIInterpreter : Visitor {
    public override void Visit (NReadStmt r) => throw new NotImplementedException ();
    public override void Visit (NWhileStmt w) => throw new NotImplementedException ();
    public override void Visit (NRepeatStmt r) => throw new NotImplementedException ();
+   public override void Visit (NBreakStmt b) => throw new NotImplementedException ();
    public override void Visit (NCallStmt c) => throw new NotImplementedException ();
 
    public override void Visit (NLiteral t) => throw new NotImplementedException ();

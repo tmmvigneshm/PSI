@@ -114,8 +114,9 @@ public class ILCodeGen : Visitor {
       Out ($"   {labl2}:");
    }
 
-   public override void Visit (NForStmt f) { 
+   public override void Visit (NForStmt f) {
       string labl1 = NextLabel (), labl2 = NextLabel ();
+      mLoops.Push (NextLabel ());
       f.Start.Accept (this);
       StoreVar (f.Var);
       Out ($"    br {labl2}");
@@ -130,30 +131,36 @@ public class ILCodeGen : Visitor {
       f.End.Accept (this);
       Out (f.Ascending ? "    cgt" : "    clt");
       Out ($"    brfalse {labl1}");
+      Out ($"   {mLoops.Pop ()}:");
    }
 
    public override void Visit (NReadStmt r) => throw new NotImplementedException ();
 
    public override void Visit (NWhileStmt w) {
       string lab1 = NextLabel (), lab2 = NextLabel ();
+      mLoops.Push (NextLabel ());
       Out ($"    br {lab2}");
       Out ($"  {lab1}:");
       w.Body.Accept (this);
       Out ($"  {lab2}:");
       w.Condition.Accept (this);
       Out ($"    brtrue {lab1}");
-   }
+      Out ($"   {mLoops.Pop ()}:");
+   }   
 
    public override void Visit (NRepeatStmt r) {
       string lab = NextLabel ();
+      mLoops.Push (NextLabel ());
       Out ($"  {lab}:");
       Visit (r.Stmts);
       r.Condition.Accept (this);
       Out ($"    brfalse {lab}");
+      Out ($"   {mLoops.Pop ()}:");
    }
    string NextLabel () => $"IL_{++mLabel:D4}";
    int mLabel;
 
+   public override void Visit (NBreakStmt b) => Out ($"    br {mLoops.Peek ()}");  
 
    public override void Visit (NCallStmt c) => CallFunction (c.Name, c.Params);
 
@@ -240,6 +247,8 @@ public class ILCodeGen : Visitor {
 
    int BoolToInt (Token token)
       => token.Text.EqualsIC ("TRUE") ? 1 : 0;
+   
+   Stack<string> mLoops = new ();
 
    // Dictionary that maps PSI.NType to .Net type names
    static Dictionary<NType, string> TMap = new () {

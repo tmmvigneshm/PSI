@@ -122,6 +122,10 @@ class TypeAnalyze : Visitor<NType> {
       return Void;
    }
 
+   public override NType Visit (NBreakStmt b) {
+      return Void;
+   }
+
    public override NType Visit (NCallStmt c) {
       CheckFunctionCall (c.Name, c.Params);
       return Void; 

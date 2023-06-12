@@ -90,6 +90,13 @@ public record NWhileStmt (NExpr Condition, NStmt Body) : NStmt {
    public override void Accept (Visitor visitor) => visitor.Visit (this);
 }
 
+// Break statement.
+public record NBreakStmt () : NStmt {
+   public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);
+   public override void Accept (Visitor visitor) => visitor.Visit (this);
+}
+
+
 // A Write or WriteLn statement (NewLine differentiates between the two)
 public record NWriteStmt (bool NewLine, NExpr[] Exprs) : NStmt {
    public override T Accept<T> (Visitor<T> visitor) => visitor.Visit (this);

@@ -116,6 +116,11 @@ public class PSIPrint : Visitor<StringBuilder> {
       return S;
    }
 
+   public override StringBuilder Visit (NBreakStmt b) {
+      NWrite ("break;");
+      return S;
+   }
+
    public override StringBuilder Visit (NLiteral t)
       => Write (t.Value.ToString ());
 
@@ -163,6 +168,7 @@ public class PSIPrint : Visitor<StringBuilder> {
       S.Append (txt);
       return S;
    }
+
 
    readonly StringBuilder S = new ();
 }

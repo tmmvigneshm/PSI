@@ -102,6 +102,7 @@ public class Parser {
       if (Match (READ)) return ReadStmt ();
       if (Match (WHILE)) return WhileStmt ();
       if (Match (REPEAT)) return RepeatStmt ();
+      if (Match (BREAK)) return BreakStmt ();
       Unexpected ();
       return null!;
    }
@@ -155,6 +156,13 @@ public class Parser {
       var stmts = new List<NStmt> ();
       while (!Match (UNTIL)) { stmts.Add (Stmt ()); Match (SEMI); }
       return new (stmts.ToArray (), Expression ()); 
+   }
+
+   // break-stmt = "break" ; .
+   NBreakStmt BreakStmt () {
+      // TODO: Match for argument in the break statement for levels.
+      // Start with level 1, i.e no arguments.
+      return new NBreakStmt ();
    }
 
    // write-stmt =  ( "writeln" | "write" ) "(" arglist ")" .
